@@ -9,35 +9,38 @@ import {
   increment,
   limit,
   startAfter,
-  DocumentData,
+  DocumentData as FirebaseDocumentData,
   QueryDocumentSnapshot,
   Timestamp,
 } from 'firebase/firestore';
+
+export type DocumentData = FirebaseDocumentData;
 import { db } from './firebase';
 
 // Helper function to convert Firestore data to plain objects
-function convertTimestamps(obj: any): any {
+function convertTimestamps<T>(obj: T): T {
   if (obj === null || obj === undefined) return obj;
   
-  // Convert Firestore Timestamp to ISO string
+  // Handle Timestamp
   if (obj instanceof Timestamp) {
-    return obj.toDate().toISOString();
+    return obj.toDate().toISOString() as unknown as T;
   }
   
   // Handle arrays
   if (Array.isArray(obj)) {
-    return obj.map(convertTimestamps);
+    return obj.map(item => convertTimestamps(item)) as unknown as T;
   }
   
   // Handle objects
-  if (typeof obj === 'object') {
-    const result: Record<string, any> = {};
+  if (typeof obj === 'object' && obj !== null) {
+    const result: Record<string, unknown> = {};
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        result[key] = convertTimestamps(obj[key]);
+        const value = (obj as Record<string, unknown>)[key];
+        result[key] = convertTimestamps(value);
       }
     }
-    return result;
+    return result as unknown as T;
   }
   
   // Return primitives as-is
@@ -73,9 +76,33 @@ export interface CategoryCount {
 /* ------------------ 🔹 Helpers ------------------ */
 
 // Convert Firestore timestamp → ISO
-const convertTimestamp = (timestamp: any): string => {
-  if (timestamp?.toDate) return timestamp.toDate().toISOString();
-  if (timestamp?.seconds) return new Date(timestamp.seconds * 1000).toISOString();
+interface FirestoreTimestamp {
+  toDate?: () => Date;
+  seconds?: number;
+}
+
+const isFirestoreTimestamp = (value: unknown): value is FirestoreTimestamp => {
+  return value !== null && 
+         typeof value === 'object' && 
+         ('toDate' in value || 'seconds' in value);
+};
+
+const convertTimestamp = (timestamp: FirestoreTimestamp | Date | undefined | null): string => {
+  if (!timestamp) return new Date().toISOString();
+  
+  if (timestamp instanceof Date) {
+    return timestamp.toISOString();
+  }
+  
+  if (isFirestoreTimestamp(timestamp)) {
+    if (timestamp.toDate) {
+      return timestamp.toDate().toISOString();
+    }
+    if (timestamp.seconds !== undefined) {
+      return new Date(timestamp.seconds * 1000).toISOString();
+    }
+  }
+  
   return new Date().toISOString();
 };
 
@@ -90,7 +117,7 @@ interface CacheEntry<T> {
   expiry: number;
 }
 
-const cache = new Map<string, CacheEntry<any>>();
+const cache = new Map<string, CacheEntry<unknown>>();
 const CACHE_TTL = 1000 * 60; // 1 minute
 
 function getFromCache<T>(key: string): T | null {
@@ -174,6 +201,8 @@ export interface GetWebsitesOptions {
 export interface GetWebsitesResult {
   websites: Website[];
   lastDoc: { id: string; data: DocumentData } | null;
+  id?: never;
+  data?: never;
 }
 
 export const getWebsites = async (

@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
 import Filters from './components/Filters';
 import WebsiteCard from './components/WebsiteCard';
-import { getWebsites, Website } from './lib/websiteService';
+import { getWebsites, Website, DocumentData } from './lib/websiteService';
 
 // Number of items to load per page (defined outside component to maintain referential equality)
 const ITEMS_PER_PAGE = 6; // Smaller batch size for better pagination
@@ -14,9 +13,9 @@ export default function Home() {
   const [websites, setWebsites] = useState<Website[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
-  const [lastDoc, setLastDoc] = useState<{ id: string; data: any } | null>(null);
+  const [lastDoc, setLastDoc] = useState<{ id: string; data: DocumentData } | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  const [activeFilter, setActiveFilter] = useState('latest');
+  const [activeFilter] = useState('latest');
 
   // Fetch initial websites when filter changes
   useEffect(() => {
