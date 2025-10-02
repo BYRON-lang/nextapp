@@ -1,11 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { Dispatch, SetStateAction } from 'react';
 
 type FilterType = 'latest' | 'popular' | 'saas' | 'web3' | 'ai' | 'uiux' | 'webapp' | 'mobileapp' | 'dashboard' | 'portfolio' | 'darkmode' | '3d' | 'motion' | 'design' | 'startup' | 'about' | 'auth' | 'onboarding';
 
-export default function Filters() {
-  const [activeFilter, setActiveFilter] = useState<FilterType>('latest');
+interface FiltersProps {
+  activeFilter: 'latest' | 'popular';
+  setActiveFilter: Dispatch<SetStateAction<'latest' | 'popular'>>;
+  activeCategory: string | null;
+  setActiveCategory: Dispatch<SetStateAction<string | null>>;
+}
+
+export default function Filters({ 
+  activeFilter, 
+  setActiveFilter,
+  activeCategory,
+  setActiveCategory 
+}: FiltersProps) {
 
   const filters: { id: FilterType; label: string }[] = [
     { id: 'latest', label: 'Latest' },
@@ -42,8 +53,15 @@ export default function Filters() {
         {filters.map((filter) => (
           <button
             key={filter.id}
-            onClick={() => setActiveFilter(filter.id)}
-            className={getButtonClass(filter.id)}
+            onClick={() => {
+              if (filter.id === 'latest' || filter.id === 'popular') {
+                setActiveFilter(filter.id);
+                setActiveCategory(null);
+              } else {
+                setActiveCategory(filter.id);
+              }
+            }}
+            className={`${getButtonClass(filter.id)} ${activeCategory === filter.id ? 'bg-[#191919] text-white border border-[#262626]' : ''}`}
           >
             {filter.label}
           </button>
