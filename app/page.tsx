@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import Filters from './components/Filters';
+import WebsiteGridSkeleton from './components/WebsiteGridSkeleton';
 import { getWebsites, Website } from './lib/websiteService';
 import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 
@@ -15,40 +17,56 @@ const WebsiteCard = dynamic(() => import('./components/WebsiteCard'), {
 const ITEMS_PER_PAGE = 6;
 
 export default function Home() {
+  const [allWebsites, setAllWebsites] = useState<Website[]>([]);
   const [websites, setWebsites] = useState<Website[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [activeFilter, setActiveFilter] = useState<'latest' | 'popular'>('latest');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const [hasMore, setHasMore] = useState(true);
 
-  /* ------------------ 🔹 Fetch Initial ------------------ */
+  const observer = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  /* ------------------ 🔹 Fetch Initial Websites ------------------ */
   useEffect(() => {
     let isMounted = true;
 
     const fetchInitialWebsites = async () => {
       try {
         setLoading(true);
+        setAllWebsites([]);
         setWebsites([]);
         setLastDoc(null);
         setHasMore(true);
 
-        const { websites, lastDoc, hasMore } = await getWebsites({
+        const { websites: fetched, lastDoc, hasMore } = await getWebsites({
           sortBy: activeFilter,
-          category: activeCategory || undefined,
           limit: ITEMS_PER_PAGE,
         });
 
         if (isMounted) {
-          setWebsites(websites);
+          setAllWebsites(fetched);
+          const filteredWebsites = activeCategory
+            ? fetched.filter(w =>
+                w.categories?.some(cat => cat.toLowerCase() === activeCategory.toLowerCase())
+              )
+            : fetched;
+
+          setWebsites(filteredWebsites);
           setLastDoc(lastDoc);
           setHasMore(hasMore);
         }
       } catch (error) {
         console.error('Error fetching websites:', error);
+        if (isMounted) {
+          setWebsites([]);
+        }
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -59,60 +77,67 @@ export default function Home() {
     };
   }, [activeFilter, activeCategory]);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const observer = useRef<IntersectionObserver | null>(null);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
+  /* ------------------ 🔹 Filter Effect ------------------ */
+  useEffect(() => {
+    setWebsites(
+      activeCategory
+        ? allWebsites.filter(w =>
+            w.categories?.some(cat => cat.toLowerCase() === activeCategory.toLowerCase())
+          )
+        : allWebsites
+    );
+  }, [activeCategory, allWebsites]);
 
-  // Define loadMoreWebsites before it's used in the effect
+  /* ------------------ 🔹 Load More Websites ------------------ */
   const loadMoreWebsites = useCallback(async () => {
-    if (loadingMore || !hasMore || !lastDoc) return;
+    if (loadingMore || !hasMore) return;
 
     setLoadingMore(true);
-
     try {
       const result = await getWebsites({
         sortBy: activeFilter,
-        category: activeCategory || undefined,
         limit: ITEMS_PER_PAGE,
-        startAfterDoc: lastDoc,
+        startAfterDoc: lastDoc || undefined,
       });
 
-      setWebsites((prev) => {
-        // Deduplicate by ID
-        const seen = new Set(prev.map((w) => w.id));
-        const newItems = result.websites.filter((w) => !seen.has(w.id));
-        return [...prev, ...newItems];
+      if (result.websites.length === 0) {
+        setHasMore(false);
+        return;
+      }
+
+      setAllWebsites(prev => {
+        const seen = new Map(prev.map(w => [w.id, w]));
+        const newItems = result.websites.filter(w => !seen.has(w.id));
+        const updatedAll = [...prev, ...newItems];
+
+        setWebsites(
+          activeCategory
+            ? updatedAll.filter(w =>
+                w.categories?.some(cat => cat.toLowerCase() === activeCategory.toLowerCase())
+              )
+            : updatedAll
+        );
+
+        return updatedAll;
       });
 
       setLastDoc(result.lastDoc);
-      setHasMore(result.hasMore);
-      setCurrentPage((prevPage) => prevPage + 1);
+      setHasMore(result.websites.length === ITEMS_PER_PAGE);
     } catch (error) {
       console.error('Error loading more websites:', error);
+      setHasMore(false);
     } finally {
       setLoadingMore(false);
     }
   }, [loadingMore, hasMore, lastDoc, activeFilter, activeCategory]);
 
-  // Reset to first page when filter or category changes
-  useEffect(() => {
-    setCurrentPage(1);
-    setWebsites([]);
-    setLastDoc(null);
-    setHasMore(true);
-  }, [activeFilter, activeCategory]);
-
-  // Observe the loading ref for infinite scroll
+  /* ------------------ 🔹 Infinite Scroll Observer ------------------ */
   useEffect(() => {
     if (loading || loadingMore || !hasMore || !loadMoreRef.current) return;
 
-    const options = {
-      root: null,
-      rootMargin: '100px',
-      threshold: 0.1,
-    };
+    const options = { root: null, rootMargin: '100px', threshold: 0.1 };
 
-    const currentObserver = new IntersectionObserver((entries) => {
+    const currentObserver = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting) {
         loadMoreWebsites();
       }
@@ -124,38 +149,33 @@ export default function Home() {
     return () => {
       currentObserver.disconnect();
     };
-  }, [loading, loadingMore, hasMore, loadMoreWebsites]);
-
-  // Loading indicator component
-  const LoadingIndicator = () => (
-    <div className="flex justify-center items-center py-8">
-      <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent"></div>
-    </div>
-  );
+  }, [loading, loadingMore, hasMore, websites.length, loadMoreWebsites]);
 
   return (
-    <div className="min-h-screen bg-[#141414] px-10 pt-4 pb-8">
+    <div className="min-h-screen bg-[#141414] px-10 pb-8">
       {/* Header */}
-      <header className="w-full">
-        <div className="relative w-32 h-auto aspect-[4/1] -ml-10">
-          <Image
-            src="/logo.png"
-            alt="Logo"
-            fill
-            className="object-contain invert"
-            priority
-          />
-        </div>
-        <div className="absolute right-4 top-0 flex items-center gap-6">
-          <a
-            href="#"
-            className="text-white text-xl hover:underline underline-offset-4 transition-all duration-200"
-          >
-            Category
-          </a>
-          <button className="bg-[#262626] text-white px-6 py-2 rounded-full text-lg font-medium hover:bg-[#333] transition-colors duration-200 cursor-pointer">
-            Submit
-          </button>
+      <header className="w-full pt-4">
+        <div className="flex items-center justify-between">
+          <div className="relative w-32 h-8">
+            <Image
+              src="/logo.png"
+              alt="Logo"
+              fill
+              className="object-contain object-left invert"
+              priority
+            />
+          </div>
+          <div className="flex items-center gap-6">
+            <Link
+              href="/category"
+              className="text-white text-xl hover:underline underline-offset-4 transition-all duration-200"
+            >
+              Category
+            </Link>
+            <button className="bg-[#262626] text-white px-6 py-2 rounded-full text-lg font-medium hover:bg-[#333] transition-colors duration-200 cursor-pointer">
+              Submit
+            </button>
+          </div>
         </div>
       </header>
 
@@ -179,32 +199,47 @@ export default function Home() {
       />
 
       {/* Website Grid */}
-      <div className="mt-8">
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent"></div>
+      <div className="mt-2 relative min-h-[200px]">
+        {/* Skeleton (overlaps grid until ready) */}
+        {loading && (
+          <div className="absolute inset-0 transition-opacity duration-300">
+            <WebsiteGridSkeleton />
           </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {websites.map((website) => {
-                const { id, ...websiteProps } = website;
-                return <WebsiteCard key={id} {...websiteProps} />;
-              })}
-            </div>
-
-            {/* Load States */}
-            {loadingMore ? (
-              <LoadingIndicator />
-            ) : hasMore ? (
-              <div ref={loadMoreRef} className="h-1 w-full"></div>
-            ) : (
-              <div className="mt-8 text-center text-gray-400">
-                No more websites to load
-              </div>
-            )}
-          </>
         )}
+
+        {/* Data Grid */}
+        <div
+          className={`transition-opacity duration-300 ${
+            loading ? 'opacity-0' : 'opacity-100'
+          }`}
+        >
+          {websites.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {websites.map((website, index) => (
+                  <WebsiteCard key={`${website.id}_${index}`} {...website} />
+                ))}
+              </div>
+
+              {/* Load More */}
+              {loadingMore ? (
+                <div className="mt-6">
+                  <WebsiteGridSkeleton />
+                </div>
+              ) : hasMore ? (
+                <div ref={loadMoreRef} className="h-1 w-full"></div>
+              ) : (
+                <div className="mt-8 text-center text-gray-400">
+                  No more websites to load
+                </div>
+              )}
+            </>
+          ) : (
+            !loading && (
+              <div className="text-center text-gray-400">No websites found</div>
+            )
+          )}
+        </div>
       </div>
     </div>
   );

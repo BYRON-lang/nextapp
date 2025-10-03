@@ -40,11 +40,12 @@ export default function Filters({
   ];
 
   const getButtonClass = (filterId: FilterType) => {
-    const baseClass = 'px-4 py-1.5 rounded-2xl text-base font-medium cursor-pointer';
-    const activeClass = 'bg-[#191919] text-white border border-[#262626]';
-    const inactiveClass = 'text-gray-400 hover:text-gray-300 transition-colors duration-150';
+    const baseClass = 'px-4 py-1.5 rounded-2xl text-base font-medium cursor-pointer transition-all duration-200';
+    const isActive = activeFilter === filterId || activeCategory === filterId;
     
-    return `${baseClass} ${activeFilter === filterId ? activeClass : inactiveClass}`;
+    return isActive 
+      ? `${baseClass} bg-[#191919] text-white border border-[#262626]`
+      : `${baseClass} text-gray-400 hover:text-gray-300 hover:bg-[#1a1a1a]`;
   };
 
   return (
@@ -61,7 +62,7 @@ export default function Filters({
                 setActiveCategory(filter.id);
               }
             }}
-            className={`${getButtonClass(filter.id)} ${activeCategory === filter.id ? 'bg-[#191919] text-white border border-[#262626]' : ''}`}
+            className={getButtonClass(filter.id)}
           >
             {filter.label}
           </button>

@@ -159,6 +159,7 @@ import {
     limit?: number;
     startAfterDoc?: QueryDocumentSnapshot<DocumentData> | null;
     category?: string;
+    builtWith?: string;
   }
   export interface GetWebsitesResult {
     websites: Website[];
@@ -171,9 +172,9 @@ import {
   export const getWebsites = async (
     options: GetWebsitesOptions = {}
   ): Promise<GetWebsitesResult> => {
-    const { sortBy = 'latest', category, limit: pageLimit = 6, startAfterDoc = null } = options;
+    const { sortBy = 'latest', category, builtWith, limit: pageLimit = 6, startAfterDoc = null } = options;
   
-    const cacheKey = `websites-${category || 'all'}-${sortBy}-${startAfterDoc?.id || 'first'}-${pageLimit}`;
+    const cacheKey = `websites-${category || 'all'}-${builtWith || 'all'}-${sortBy}-${startAfterDoc?.id || 'first'}-${pageLimit}`;
     const cached = getFromCache<GetWebsitesResult>(cacheKey);
     if (cached) return cached;
   
@@ -220,6 +221,20 @@ import {
         filtered = websites.filter((site) =>
           site.categories?.some((cat) => normalizeCategoryName(cat) === searchCategory)
         );
+      }
+
+      if (builtWith) {
+        const searchFramework = normalizeCategoryName(builtWith);
+        filtered = filtered.filter((site) => {
+          const siteBuiltWith = site.builtWith;
+          if (!siteBuiltWith) return false;
+
+          // Handle both string and array cases
+          const frameworks = Array.isArray(siteBuiltWith) ? siteBuiltWith : [siteBuiltWith];
+          return frameworks.some((framework) =>
+            normalizeCategoryName(framework) === searchFramework
+          );
+        });
       }
   
       const result: GetWebsitesResult = {
