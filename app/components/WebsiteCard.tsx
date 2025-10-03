@@ -68,34 +68,33 @@ export default function WebsiteCard({
   };
 
   return (
-    <Link href={`/website/${id}`}>
+    <Link 
+      href={`/website/${id}`} 
+      className="block w-full aspect-[1.91/1]"
+    >
       <div
-        className="relative w-full h-[400px] bg-[#0a0a0a] border border-[#262626] rounded-lg overflow-hidden hover:border-[#404040] transition-colors"
+        className="relative w-full h-full bg-[#0a0a0a] border border-[#262626] rounded-lg overflow-hidden hover:border-[#404040] transition-colors"
         onMouseEnter={handleHoverStart}
         onMouseLeave={handleHoverEnd}
       >
-        <div className="relative w-full h-full">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <video
-              ref={videoRef}
-              className="absolute w-full h-full object-cover"
-              loop
-              muted
-              playsInline
-              preload="metadata"
-              onLoadedMetadata={handleLoadedMetadata}
-            >
-              <source src={videoUrl} type="video/mp4" />
-              Your browser does not support the video tag.
-            </video>
-          </div>
-
-          {/* Website name pill */}
-          <div className="absolute bottom-3 left-3 z-10">
-            <span className="inline-block bg-[#262626] text-white text-sm px-3 py-1 rounded-full">
-              {name}
-            </span>
-          </div>
+        <video
+          ref={videoRef}
+          className="w-full h-full object-cover"
+          loop
+          muted
+          playsInline
+          preload="metadata"
+          onLoadedMetadata={handleLoadedMetadata}
+        >
+          <source src={videoUrl} type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
+        
+        {/* Website name pill */}
+        <div className="absolute bottom-3 left-3 z-10">
+          <span className="inline-block bg-[#262626] text-white text-sm px-3 py-1 rounded-full">
+            {name}
+          </span>
         </div>
       </div>
     </Link>

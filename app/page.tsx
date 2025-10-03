@@ -14,7 +14,7 @@ const WebsiteCard = dynamic(() => import('./components/WebsiteCard'), {
   ssr: false,
 });
 
-const ITEMS_PER_PAGE = 6;
+const ITEMS_PER_PAGE = 8;
 
 export default function Home() {
   const [allWebsites, setAllWebsites] = useState<Website[]>([]);
@@ -215,7 +215,7 @@ export default function Home() {
         >
           {websites.length > 0 ? (
             <>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {websites.map((website, index) => (
                   <WebsiteCard key={`${website.id}_${index}`} {...website} />
                 ))}

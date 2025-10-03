@@ -1,6 +1,7 @@
 'use client';
 
 import { Dispatch, SetStateAction } from 'react';
+import '../styles/scrollbar-hide.css';
 
 type FilterType = 'latest' | 'popular' | 'saas' | 'web3' | 'ai' | 'uiux' | 'webapp' | 'mobileapp' | 'dashboard' | 'portfolio' | 'darkmode' | '3d' | 'motion' | 'design' | 'startup' | 'about' | 'auth' | 'onboarding';
 
@@ -40,7 +41,7 @@ export default function Filters({
   ];
 
   const getButtonClass = (filterId: FilterType) => {
-    const baseClass = 'px-4 py-1.5 rounded-2xl text-base font-medium cursor-pointer transition-all duration-200';
+    const baseClass = 'px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-base font-medium cursor-pointer transition-all duration-200 whitespace-nowrap';
     const isActive = activeFilter === filterId || activeCategory === filterId;
     
     return isActive 
@@ -49,24 +50,28 @@ export default function Filters({
   };
 
   return (
-    <div className="w-full py-8 mt-12">
-      <div className="flex flex-wrap gap-4 justify-start">
-        {filters.map((filter) => (
-          <button
-            key={filter.id}
-            onClick={() => {
-              if (filter.id === 'latest' || filter.id === 'popular') {
-                setActiveFilter(filter.id);
-                setActiveCategory(null);
-              } else {
-                setActiveCategory(filter.id);
-              }
-            }}
-            className={getButtonClass(filter.id)}
-          >
-            {filter.label}
-          </button>
-        ))}
+    <div className="w-full py-4 sm:py-8 mt-8 sm:mt-12 relative">
+      <div className="relative">
+        {/* Gradient fade effect on the right side */}
+        <div className="absolute right-0 top-0 bottom-0 w-8 sm:w-12 bg-gradient-to-l from-[#141414] to-transparent z-10 pointer-events-none"></div>
+        <div className="flex gap-2 sm:gap-4 overflow-x-auto pb-2 sm:pb-4 -mx-2 sm:-mx-4 px-2 sm:px-4 scrollbar-hide">
+          {filters.map((filter) => (
+            <button
+              key={filter.id}
+              onClick={() => {
+                if (filter.id === 'latest' || filter.id === 'popular') {
+                  setActiveFilter(filter.id);
+                  setActiveCategory(null);
+                } else {
+                  setActiveCategory(filter.id);
+                }
+              }}
+              className={getButtonClass(filter.id)}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
