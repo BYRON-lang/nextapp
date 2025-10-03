@@ -15,6 +15,34 @@ import {
   } from 'firebase/firestore';
   import { db } from './firebase';
   
+  /* ------------------ 🔹 Utilities ------------------ */
+  
+  function getCdnVideoUrl(storageUrl: string): string {
+    try {
+      console.log('Original video URL:', storageUrl);
+
+      if (storageUrl.includes('cdn.gridrr.com')) return storageUrl;
+
+      const decodedUrl = decodeURIComponent(storageUrl);
+      let fileName = '';
+
+      // Extract filename from URL (handles both videos/ and videos%2F)
+      const match = decodedUrl.match(/videos(?:%2F|\/)([^?]+)/);
+      if (match && match[1]) fileName = match[1];
+
+      // Encode filename for safe CDN URL
+      const encodedFileName = encodeURIComponent(fileName);
+
+      const cdnUrl = `https://cdn.gridrr.com/videos/${encodedFileName}`;
+      console.log('Generated CDN URL:', cdnUrl);
+
+      return cdnUrl;
+    } catch (e) {
+      console.error('Error generating CDN URL, falling back to original URL:', e);
+      return storageUrl;
+    }
+  }
+
   /* ------------------ 🔹 Types ------------------ */
   
   export type QueryDocumentSnapshot<T = DocumentData> = FirestoreQueryDocumentSnapshot<T>;
@@ -97,7 +125,6 @@ import {
   }
   
   /* ------------------ 🔹 Sitemap Websites ------------------ */
-  
   export interface WebsiteForSitemap {
     id: string;
     updatedAt?: string;
@@ -105,52 +132,19 @@ import {
   
   export async function getAllWebsitesForSitemap(): Promise<WebsiteForSitemap[]> {
     try {
-      const websitesCollection = collection(db, 'websites');
-      const q = query(websitesCollection, orderBy('createdAt', 'desc'));
-  
+      const websitesRef = collection(db, 'websites');
+      const q = query(websitesRef, orderBy('uploadedAt', 'desc'));
       const querySnapshot = await getDocs(q);
-      const websites: WebsiteForSitemap[] = [];
-  
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        websites.push({
-          id: doc.id,
-          updatedAt: data.updatedAt?.toDate()?.toISOString() || new Date().toISOString(),
-        });
-      });
-  
-      return websites;
-    } catch (error) {
-      console.error('Error fetching all websites for sitemap:', error);
-      return [];
-    }
-  }
-  
-  /* ------------------ 🔹 Get Website By ID ------------------ */
-  
-  export const getWebsiteById = async (id: string): Promise<Website> => {
-    try {
-      const docRef = doc(db, 'websites', id);
-      const docSnap = await getDoc(docRef);
-      if (!docSnap.exists()) throw new Error('Website not found');
-  
-      const data = docSnap.data();
-      return {
-        id: docSnap.id,
-        name: data.name || 'Untitled',
-        videoUrl: data.videoUrl || '',
-        url: data.url || '#',
-        builtWith: data.builtWith,
-        categories: Array.isArray(data.categories) ? data.categories : [],
-        socialLinks: data.socialLinks || {},
-        uploadedAt: convertTimestamp(data.uploadedAt),
-        views: data.views || 0,
-      } as Website;
+      
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        updatedAt: convertTimestamp(doc.data().uploadedAt)
+      }));
     } catch (err) {
-      console.error('Error getting website:', err);
+      console.error('Error getting websites for sitemap:', err);
       throw err;
     }
-  };
+  }
   
   /* ------------------ 🔹 Pagination ------------------ */
   
@@ -196,7 +190,7 @@ import {
         return {
           id: doc.id,
           name: rawData.name || 'Untitled',
-          videoUrl: rawData.videoUrl || '',
+          videoUrl: rawData.videoUrl ? getCdnVideoUrl(rawData.videoUrl) : '',
           url: rawData.url || '#',
           builtWith: rawData.builtWith,
           categories: Array.isArray(rawData.categories) ? rawData.categories : [],
@@ -250,6 +244,34 @@ import {
       return { websites: [], lastDoc: null, hasMore: false };
     }
   };
+  
+  /* ------------------ 🔹 Get Website By ID ------------------ */
+  
+  export async function getWebsiteById(id: string): Promise<Website> {
+    try {
+      const docRef = doc(db, 'websites', id);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        throw new Error('Website not found');
+      }
+
+      const websiteData = convertTimestamps({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }) as Website;
+
+      // Convert video URL to CDN URL
+      if (websiteData.videoUrl) {
+        websiteData.videoUrl = getCdnVideoUrl(websiteData.videoUrl);
+      }
+
+      return websiteData;
+    } catch (error) {
+      console.error('Error getting website by ID:', error);
+      throw error;
+    }
+  }
   
   /* ------------------ 🔹 Adjacent Websites ------------------ */
   

@@ -1,16 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getWebsiteById, incrementWebsiteViews } from '@/app/lib/websiteService';
 import { Website } from '@/app/lib/websiteService';
 import { useParams } from 'next/navigation';
 import WebsiteCardSkeleton from '@/app/components/WebsiteCardSkeleton';
+
 
 export default function WebsitePage() {
   const params = useParams();
   const [website, setWebsite] = useState<Website | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const fetchWebsite = async () => {
@@ -22,7 +24,9 @@ export default function WebsitePage() {
       try {
         setIsLoading(true);
         setError(null);
+        console.log('Fetching website with ID:', params.id);
         const websiteData = await getWebsiteById(params.id as string);
+        console.log('Website data received:', websiteData);
         setWebsite(websiteData);
       } catch (error) {
         console.error('Error fetching website:', error);
@@ -35,10 +39,25 @@ export default function WebsitePage() {
     fetchWebsite();
   }, [params?.id]);
 
-  // Increment views when website data is loaded
+  // Increment views when website data is loaded and set up video autoplay
   useEffect(() => {
     if (website) {
+      console.log('Website data loaded:', website);
       incrementWebsiteViews(website.id);
+      
+      // Set up video autoplay after 2 seconds
+      const timer = setTimeout(() => {
+        if (videoRef.current) {
+          console.log('Attempting to play video...');
+          videoRef.current.play().catch(error => {
+            console.error('Error playing video:', error);
+          });
+        } else {
+          console.error('Video ref is null');
+        }
+      }, 2000);
+
+      return () => clearTimeout(timer);
     }
   }, [website]);
 
@@ -60,15 +79,24 @@ export default function WebsitePage() {
         {/* Video Preview - Top Center */}
         <div className="flex justify-center mb-4">
           <div className="w-full max-w-5xl">
-            <video
-              className="rounded-lg border-2 border-[#262626]"
-              src={website.videoUrl}
-              poster={website.videoUrl}
-              width="1200"
-              height="800"
-            >
-              Your browser does not support the video tag.
-            </video>
+            <div className="relative">
+              <video
+                ref={videoRef}
+                className="rounded-lg border-2 border-[#262626] w-full h-auto"
+                src={website.videoUrl}
+                poster=""
+                width="auto"
+                height="auto"
+                muted
+                playsInline
+                preload="auto"
+                onError={(e) => {
+                  console.error('Error loading video');
+                }}
+              >
+                Your browser does not support the video tag.
+              </video>
+            </div>
           </div>
         </div>
 
