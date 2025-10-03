@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import Filters from './components/Filters';
@@ -59,24 +59,11 @@ export default function Home() {
     };
   }, [activeFilter, activeCategory]);
 
-  /* ------------------ 🔹 Infinite Scroll ------------------ */
-  const handleScroll = useCallback(() => {
-    if (loading || loadingMore || !hasMore) return;
+  const [currentPage, setCurrentPage] = useState(1);
+  const observer = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
-    const scrollPosition = window.innerHeight + document.documentElement.scrollTop;
-    const bottomThreshold = document.documentElement.offsetHeight - 500;
-
-    if (scrollPosition >= bottomThreshold) {
-      loadMoreWebsites();
-    }
-  }, [loading, loadingMore, hasMore, lastDoc, activeFilter, activeCategory]);
-
-  useEffect(() => {
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [handleScroll]);
-
-  /* ------------------ 🔹 Load More ------------------ */
+  // Define loadMoreWebsites before it's used in the effect
   const loadMoreWebsites = useCallback(async () => {
     if (loadingMore || !hasMore || !lastDoc) return;
 
@@ -99,6 +86,7 @@ export default function Home() {
 
       setLastDoc(result.lastDoc);
       setHasMore(result.hasMore);
+      setCurrentPage((prevPage) => prevPage + 1);
     } catch (error) {
       console.error('Error loading more websites:', error);
     } finally {
@@ -106,23 +94,50 @@ export default function Home() {
     }
   }, [loadingMore, hasMore, lastDoc, activeFilter, activeCategory]);
 
-  /* ------------------ 🔹 Skeleton Loader ------------------ */
-  const renderSkeleton = () => (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      {[...Array(ITEMS_PER_PAGE)].map((_, i) => (
-        <div
-          key={`skeleton-${i}`}
-          className="w-full h-[400px] bg-[#0a0a0a] border border-[#262626] animate-pulse"
-        />
-      ))}
+  // Reset to first page when filter or category changes
+  useEffect(() => {
+    setCurrentPage(1);
+    setWebsites([]);
+    setLastDoc(null);
+    setHasMore(true);
+  }, [activeFilter, activeCategory]);
+
+  // Observe the loading ref for infinite scroll
+  useEffect(() => {
+    if (loading || loadingMore || !hasMore || !loadMoreRef.current) return;
+
+    const options = {
+      root: null,
+      rootMargin: '100px',
+      threshold: 0.1,
+    };
+
+    const currentObserver = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        loadMoreWebsites();
+      }
+    }, options);
+
+    currentObserver.observe(loadMoreRef.current);
+    observer.current = currentObserver;
+
+    return () => {
+      currentObserver.disconnect();
+    };
+  }, [loading, loadingMore, hasMore, loadMoreWebsites]);
+
+  // Loading indicator component
+  const LoadingIndicator = () => (
+    <div className="flex justify-center items-center py-8">
+      <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent"></div>
     </div>
   );
 
   return (
     <div className="min-h-screen bg-[#141414] px-10 pt-4 pb-8">
       {/* Header */}
-      <header className="relative w-full">
-        <div className="relative w-32 h-auto aspect-[4/1]">
+      <header className="w-full">
+        <div className="relative w-32 h-auto aspect-[4/1] -ml-10">
           <Image
             src="/logo.png"
             alt="Logo"
@@ -166,7 +181,9 @@ export default function Home() {
       {/* Website Grid */}
       <div className="mt-8">
         {loading ? (
-          renderSkeleton()
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent"></div>
+          </div>
         ) : (
           <>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -177,12 +194,11 @@ export default function Home() {
             </div>
 
             {/* Load States */}
-            {loadingMore && (
-              <div className="mt-8 flex justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-              </div>
-            )}
-            {!loadingMore && !hasMore && websites.length > 0 && (
+            {loadingMore ? (
+              <LoadingIndicator />
+            ) : hasMore ? (
+              <div ref={loadMoreRef} className="h-1 w-full"></div>
+            ) : (
               <div className="mt-8 text-center text-gray-400">
                 No more websites to load
               </div>
