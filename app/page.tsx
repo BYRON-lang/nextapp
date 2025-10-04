@@ -6,7 +6,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import Filters from './components/Filters';
 import WebsiteGridSkeleton from './components/WebsiteGridSkeleton';
-import { getWebsites, Website } from './lib/websiteService';
+import { getWebsitePreviews, type GetWebsitePreviewsResult } from './components/Websitepreviewservice';
 import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 
 // Dynamically import WebsiteCard with no SSR
@@ -14,11 +14,11 @@ const WebsiteCard = dynamic(() => import('./components/WebsiteCard'), {
   ssr: false,
 });
 
-const ITEMS_PER_PAGE = 8;
+const ITEMS_PER_PAGE = 12;
 
 export default function Home() {
-  const [allWebsites, setAllWebsites] = useState<Website[]>([]);
-  const [websites, setWebsites] = useState<Website[]>([]);
+  const [allWebsites, setAllWebsites] = useState<GetWebsitePreviewsResult['websites']>([]);
+  const [websites, setWebsites] = useState<GetWebsitePreviewsResult['websites']>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -41,27 +41,23 @@ export default function Home() {
         setLastDoc(null);
         setHasMore(true);
 
-        const { websites: fetched, lastDoc, hasMore } = await getWebsites({
+        const result = await getWebsitePreviews({
           sortBy: activeFilter,
           limit: ITEMS_PER_PAGE,
+          category: activeCategory || undefined,
         });
 
         if (isMounted) {
-          setAllWebsites(fetched);
-          const filteredWebsites = activeCategory
-            ? fetched.filter(w =>
-                w.categories?.some(cat => cat.toLowerCase() === activeCategory.toLowerCase())
-              )
-            : fetched;
-
-          setWebsites(filteredWebsites);
-          setLastDoc(lastDoc);
-          setHasMore(hasMore);
+          setAllWebsites(result.websites);
+          setWebsites(result.websites);
+          setLastDoc(result.lastDoc);
+          setHasMore(result.hasMore);
         }
       } catch (error) {
         console.error('Error fetching websites:', error);
         if (isMounted) {
           setWebsites([]);
+          setAllWebsites([]);
         }
       } finally {
         if (isMounted) {
@@ -79,25 +75,22 @@ export default function Home() {
 
   /* ------------------ 🔹 Filter Effect ------------------ */
   useEffect(() => {
-    setWebsites(
-      activeCategory
-        ? allWebsites.filter(w =>
-            w.categories?.some(cat => cat.toLowerCase() === activeCategory.toLowerCase())
-          )
-        : allWebsites
-    );
-  }, [activeCategory, allWebsites]);
+    // No need to filter here as the API handles filtering by category
+    // Just ensure we're showing the correct set of websites
+    setWebsites(allWebsites);
+  }, [allWebsites]);
 
   /* ------------------ 🔹 Load More Websites ------------------ */
   const loadMoreWebsites = useCallback(async () => {
-    if (loadingMore || !hasMore) return;
+    if (loadingMore || !hasMore || !lastDoc) return;
 
     setLoadingMore(true);
     try {
-      const result = await getWebsites({
+      const result = await getWebsitePreviews({
         sortBy: activeFilter,
         limit: ITEMS_PER_PAGE,
-        startAfterDoc: lastDoc || undefined,
+        startAfterDoc: lastDoc,
+        category: activeCategory || undefined,
       });
 
       if (result.websites.length === 0) {
@@ -106,19 +99,10 @@ export default function Home() {
       }
 
       setAllWebsites(prev => {
-        const seen = new Map(prev.map(w => [w.id, w]));
-        const newItems = result.websites.filter(w => !seen.has(w.id));
-        const updatedAll = [...prev, ...newItems];
-
-        setWebsites(
-          activeCategory
-            ? updatedAll.filter(w =>
-                w.categories?.some(cat => cat.toLowerCase() === activeCategory.toLowerCase())
-              )
-            : updatedAll
-        );
-
-        return updatedAll;
+        // Filter out any duplicates by ID
+        const existingIds = new Set(prev.map(w => w.id));
+        const newItems = result.websites.filter(w => !existingIds.has(w.id));
+        return [...prev, ...newItems];
       });
 
       setLastDoc(result.lastDoc);

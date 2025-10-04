@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { getWebsites } from '../lib/websiteService';
+import { getWebsitePreviews } from './Websitepreviewservice';
+import type { WebsitePreview } from './Websitepreviewservice';
 
 // Helper function to normalize names for comparison
 const normalizeName = (name: string): string => {
@@ -106,11 +107,11 @@ export default function CategoriesSection() {
     const fetchCounts = async () => {
       try {
         setIsLoading(true);
-        const { websites } = await getWebsites({ limit: 1000 });
+        const { websites } = await getWebsitePreviews({ limit: 1000 });
         
         const newCounts: Record<string, number> = {};
         
-        websites.forEach(website => {
+        websites.forEach((website: WebsitePreview & { categories?: string[]; builtWith?: string | string[] }) => {
           // Count categories
           if (website.categories) {
             website.categories.forEach((category: string) => {

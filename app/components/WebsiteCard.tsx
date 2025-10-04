@@ -7,17 +7,12 @@ interface WebsiteCardProps {
   id: string;
   name: string;
   videoUrl: string;
-  url: string;
-  categories: string[];
-  views?: number;
-  uploadedAt: string;
-  builtWith?: string | string[];
 }
 
 export default function WebsiteCard({
   id,
   name,
-  videoUrl
+  videoUrl,
 }: WebsiteCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
