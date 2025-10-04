@@ -90,7 +90,7 @@ export default function WebsitePage() {
                 muted
                 playsInline
                 preload="auto"
-                onError={(e) => {
+                onError={(_e) => {
                   console.error('Error loading video');
                 }}
               >

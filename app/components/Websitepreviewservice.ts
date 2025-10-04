@@ -10,7 +10,6 @@ import {
   QueryDocumentSnapshot,
   DocumentData,
   Timestamp,
-  DocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
@@ -41,12 +40,11 @@ interface CacheEntry<T> {
   data: T;
   expiry: number;
 }
-
-const cache = new Map<string, CacheEntry<any>>();
+const cache = new Map<string, CacheEntry<unknown>>();
 const CACHE_TTL = 1000 * 60; // 1 minute
 
 function getFromCache<T>(key: string): T | null {
-  const entry = cache.get(key);
+  const entry = cache.get(key) as CacheEntry<T> | undefined;
   if (!entry) return null;
   if (Date.now() > entry.expiry) {
     cache.delete(key);
@@ -61,7 +59,7 @@ function setCache<T>(key: string, data: T): void {
 
 /* ------------------ 🔹 Helper Functions ------------------ */
 
-function convertTimestamps(data: any): any {
+function convertTimestamps(data: unknown): unknown {
   if (data === null || data === undefined) return data;
 
   if (data instanceof Timestamp) {
@@ -73,10 +71,10 @@ function convertTimestamps(data: any): any {
   }
 
   if (typeof data === 'object') {
-    const result: Record<string, any> = {};
+    const result: Record<string, unknown> = {};
     for (const key in data) {
       if (Object.prototype.hasOwnProperty.call(data, key)) {
-        result[key] = convertTimestamps(data[key]);
+        result[key] = convertTimestamps((data as Record<string, unknown>)[key]);
       }
     }
     return result;
@@ -236,7 +234,7 @@ export async function getLatestWebsites(
     const docs = snapshot.docs;
 
     const websites: WebsitePreview[] = docs.slice(0, limitCount).map((doc) => {
-      const data = convertTimestamps(doc.data());
+      const data = convertTimestamps(doc.data()) as DocumentData;
       return {
         id: doc.id,
         name: data.name || 'Untitled',

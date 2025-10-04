@@ -134,7 +134,7 @@ export default function CategoriesSection() {
         });
         
         setCounts(newCounts);
-      } catch (error) {
+      } catch (_error) {
       } finally {
         setIsLoading(false);
       }

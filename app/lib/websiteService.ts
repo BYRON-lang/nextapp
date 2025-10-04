@@ -167,8 +167,7 @@ export async function getWebsiteById(id: string): Promise<Website> {
 /* ------------------ 🔹 Adjacent Websites ------------------ */
 
 export const getAdjacentWebsites = async (
-  currentId: string,
-  sortBy: 'latest' | 'popular' = 'latest'
+  currentId: string
 ): Promise<{ prev: Website | null; next: Website | null }> => {
   try {
     // Note: If you use a preview service, you can fetch previews here instead of all websites
