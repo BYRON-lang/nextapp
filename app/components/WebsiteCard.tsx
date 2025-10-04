@@ -81,7 +81,10 @@ export default function WebsiteCard({
           preload="metadata"
           onLoadedMetadata={handleLoadedMetadata}
         >
-          <source src={videoUrl} type="video/mp4" />
+          <source 
+            src={videoUrl} 
+            type={videoUrl.endsWith('.webm') ? 'video/webm' : 'video/mp4'} 
+          />
           Your browser does not support the video tag.
         </video>
         

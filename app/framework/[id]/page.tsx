@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getWebsites, Website } from '@/app/lib/websiteService';
+import { WebsitePreview, getWebsitesByFramework } from '@/app/components/Websitepreviewservice';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
@@ -21,7 +21,7 @@ function formatFrameworkName(name: string): string {
 
 export default function FrameworkPage() {
   const params = useParams();
-  const [websites, setWebsites] = useState<Website[]>([]);
+  const [websites, setWebsites] = useState<WebsitePreview[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,13 +31,8 @@ export default function FrameworkPage() {
       try {
         setLoading(true);
         const frameworkName = decodeURIComponent(params.id as string).replace(/-/g, ' ');
-        const { websites } = await getWebsites({
-          builtWith: frameworkName,
-          sortBy: 'latest',
-          limit: 100
-        });
-
-        setWebsites(websites || []);
+        const websites = await getWebsitesByFramework(frameworkName);
+        setWebsites(websites);
       } catch (error) {
         console.error('Error fetching websites:', error);
         setWebsites([]);
@@ -126,9 +121,11 @@ export default function FrameworkPage() {
 
         {/* Website Cards */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {websites.map((website, index) => (
-            <WebsiteCard key={`${website.id}_${index}`} {...website} />
-          ))}
+          {websites.map((website, index) => (() => {
+            // Ensure we only pass the required props to WebsiteCard
+            const { id, name, videoUrl } = website;
+            return <WebsiteCard key={`${id}_${index}`} id={id} name={name} videoUrl={videoUrl} />;
+          })())}
         </div>
       </div>
     </div>
